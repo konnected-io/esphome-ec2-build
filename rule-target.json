@@ -1,0 +1,25 @@
+{
+  "Rule": "esphome-cloud-build-start",
+  "Targets": [
+    {
+      "Id": "Id911962fb-3b30-4c8f-9f3a-c8a1f5e6e543",
+      "Arn": "arn:aws:ssm:us-east-1::document/AWS-RunShellScript",
+      "RoleArn": "arn:aws:iam::ACCOUNT_ID:role/service-role/Amazon_EventBridge_Invoke_Run_Command_1000594004",
+      "InputTransformer": {
+        "InputPathsMap": {
+          "objectBucket": "$.detail.bucket.name",
+          "objectKey": "$.detail.object.key"
+        },
+        "InputTemplate": "{\n  \"executionTimeout\": [\"600\"],\n  \"commands\": [\"runuser -l ec2-user -c './build.sh <objectBucket> <objectKey>'\"],\n  \"workingDirectory\": [\"/home/ec2-user\"]\n}"
+      },
+      "RunCommandParameters": {
+        "RunCommandTargets": [
+          {
+            "Key": "InstanceIds",
+            "Values": ["INSTANCE_ID"]
+          }
+        ]
+      }
+    }
+  ]
+}
