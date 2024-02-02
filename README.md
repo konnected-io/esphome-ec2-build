@@ -22,28 +22,26 @@ This creates an EC2 instance and bootstraps it by installing required Python pac
 aws ec2 run-instances                                  \
   --image-id ami-0a3c3a20c09d6f377                     \
   --count 1                                            \
-  --instance-type t2.micro                             \
+  --instance-type t2.medium                            \
   --key-name esphome-cloud-build-key                   \
   --security-group-ids sg-0de24bf7302c0ac79            \
   --user-data file://bootstrap.sh                      \
   --iam-instance-profile '
       {
         "Name" : "EnablesEC2ToAccessSystemsManagerRole"
-      }'
+      }'                                               \
+  --tag-specifications '[{"ResourceType":"instance","Tags":[{"Key":"esphome-cloud-build","Value":"build"}]}]'    
 ```
 
 Save the Instance ID that is created, you will need it later. View and connect to the instance in AWS Console: EC2 > Instances
 
 ### Update SSM Agent
 
-Replace `INSTANCE_ID` below with your newly created EC2 Instance ID and run the command
-to update the SSM Agent.
-
 ```
 aws ssm send-command                                                    \
   --document-name "AWS-UpdateSSMAgent"                                  \
   --document-version "1"                                                \
-  --targets '[{"Key":"InstanceIds","Values":["INSTANCE_ID"]}]'          \
+  --targets '[{"Key":"tag:esphome-cloud-build","Values":["build"]}]'          \
   --cloud-watch-output-config '{"CloudWatchOutputEnabled":true,"CloudWatchLogGroupName":"esphome-cloud-build"}'
 ```
 
@@ -83,7 +81,7 @@ Add a Target to the EventBridge Rule to kick off the build script on the EC2 ins
 later replace the instance, just edit `rule-target.json` and run this command again to point
 the EventBridge Rule to the new instance.
 
-Replace `INSTANCE_ID` in `rule-target.json` with your EC2 Instance ID.
+Replace `ACCOUNT_ID` in `rule-target.json` with your AWS Account ID.
 
 ```
 aws events put-targets --cli-input-json file://rule-target.json

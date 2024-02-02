@@ -15,8 +15,8 @@
       "RunCommandParameters": {
         "RunCommandTargets": [
           {
-            "Key": "InstanceIds",
-            "Values": ["INSTANCE_ID"]
+            "Key": "tag:esphome-cloud-build",
+            "Values": ["build"]
           }
         ]
       }
