@@ -24,7 +24,8 @@ then
     aws s3 cp ${fw_path}/firmware.bin s3://${bucket}/esphome-builds/${name}.${version}.ota.bin 
     aws s3 cp ${fw_path}/firmware-factory.bin s3://${bucket}/esphome-builds/${name}.${version}.0x0.bin
   else    
-    payload="{\"name\":\"${name}\", \"version\":\"${version}\", \"error\":\"$(cat /tmp/${name}.${version}.log.txt)\"}"
+    base64_log=$(cat /tmp/${name}.${version}.log.txt | base64)
+    payload="{\"name\":\"${name}\", \"version\":\"${version}\", \"error\":\"$(echo $base64_log)\"}"
     aws lambda invoke --function-name konnected-cloud-${KONNECTED_ENV}-esphome_build_job-failure \
       --cli-binary-format base64 \
       --payload "$(echo $payload | base64)" \
