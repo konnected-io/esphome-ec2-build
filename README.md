@@ -23,13 +23,13 @@ aws ec2 run-instances                                  \
   --image-id ami-0a3c3a20c09d6f377                     \
   --count 1                                            \
   --instance-type t2.medium                            \
-  --key-name esphome-cloud-build-key                   \
-  --security-group-ids sg-0de24bf7302c0ac79            \
+  --key-name esphome-cloud-build-key-production                   \
   --user-data file://bootstrap.sh                      \
   --iam-instance-profile '
       {
         "Name" : "EnablesEC2ToAccessSystemsManagerRole"
       }'                                               \
+  --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30}}]' \
   --tag-specifications '[{"ResourceType":"instance","Tags":[{"Key":"esphome-cloud-build","Value":"build"}]}]'    
 ```
 
@@ -70,11 +70,14 @@ aws events put-rule --name esphome-cloud-build-start                            
       "detail-type": ["Object Created"],
       "detail": {
         "bucket": {
-          "name": ["BUCKET"]
+          "name": ["konnected-esphome-builds"]
         }
       }
     }'                                                                                      \
 ```
+
+### Create .env
+Set `KONNECTED_ENV` to `dev` or `prod` in a `.env` file in the home directory.
 
 ### Create/update Target Instance
 Add a Target to the EventBridge Rule to kick off the build script on the EC2 instance. If you

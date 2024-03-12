@@ -4,6 +4,11 @@ bucket=$1
 key=$2
 regex="^esphome-configs\/(konnected-[0-9a-f]+)\.([0-9]+)\.yaml$"
 
+# load .env
+set -o allexport
+source .env 
+set +o allexport
+
 if [[ $key =~ $regex ]]
 then
 
@@ -20,7 +25,7 @@ then
     aws s3 cp ${fw_path}/firmware-factory.bin s3://${bucket}/esphome-builds/${name}.${version}.0x0.bin
   else    
     payload="{\"name\":\"${name}\", \"version\":\"${version}\", \"error\":\"$(cat /tmp/${name}.${version}.log.txt)\"}"
-    aws lambda invoke --function-name konnected-cloud-dev-esphome_build_job-failure \
+    aws lambda invoke --function-name konnected-cloud-${KONNECTED_ENV}-esphome_build_job-failure \
       --cli-binary-format base64 \
       --payload "$(echo $payload | base64)" \
       /dev/null
