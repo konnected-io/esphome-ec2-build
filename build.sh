@@ -16,7 +16,9 @@ then
   version="${BASH_REMATCH[2]}"
   aws s3 cp s3://${bucket}/${key} ${key}
   echo "Building ${name} v${version} with ESPHome $(esphome version) ~~"
-  esphome compile ${key} &> /tmp/${name}.${version}.log.txt
+  
+  # Run the ESPHome build and capture colorized output
+  script --flush --quiet --return /tmp/${name}.${version}.log.txt --command "esphome compile ${key}"
   
   if [ $? -eq 0 ]
   then
