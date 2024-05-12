@@ -25,6 +25,7 @@ then
     fw_path=~/esphome-configs/.esphome/build/${name}/.pioenvs/${name}
     aws s3 cp ${fw_path}/firmware.bin s3://${bucket}/esphome-builds/${name}.${version}.ota.bin 
     aws s3 cp ${fw_path}/firmware-factory.bin s3://${bucket}/esphome-builds/${name}.${version}.0x0.bin
+    rm -rf ~/esphome-configs/.esphome/build/${name}
   else    
     base64_log=$(cat /tmp/${name}.${version}.log.txt | base64)
     payload="{\"name\":\"${name}\", \"version\":\"${version}\", \"error\":\"$(echo $base64_log)\"}"
