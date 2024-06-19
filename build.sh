@@ -23,8 +23,8 @@ then
   if [ $? -eq 0 ]
   then
     fw_path=~/esphome-configs/.esphome/build/${name}/.pioenvs/${name}
-    aws s3 cp ${fw_path}/firmware.bin s3://${bucket}/esphome-builds/${name}.${version}.ota.bin 
-    aws s3 cp ${fw_path}/firmware-factory.bin s3://${bucket}/esphome-builds/${name}.${version}.0x0.bin
+    aws s3 cp ${fw_path}/firmware.ota.bin s3://${bucket}/esphome-builds/${name}.${version}.ota.bin 
+    aws s3 cp ${fw_path}/firmware.factory.bin s3://${bucket}/esphome-builds/${name}.${version}.0x0.bin
     rm -rf ~/esphome-configs/.esphome/build/${name}
   else    
     base64_log=$(cat /tmp/${name}.${version}.log.txt | base64)
