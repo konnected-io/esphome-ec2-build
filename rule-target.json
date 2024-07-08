@@ -4,7 +4,7 @@
     {
       "Id": "Id911962fb-3b30-4c8f-9f3a-c8a1f5e6e543",
       "Arn": "arn:aws:ssm:us-east-1::document/AWS-RunShellScript",
-      "RoleArn": "arn:aws:iam::ACCOUNT_ID:role/service-role/Amazon_EventBridge_Invoke_Run_Command_1000594004",
+      "RoleArn": "arn:aws:iam::684083964462:role/service-role/Amazon_EventBridge_Invoke_Run_Command_1000594004",
       "InputTransformer": {
         "InputPathsMap": {
           "objectBucket": "$.detail.bucket.name",

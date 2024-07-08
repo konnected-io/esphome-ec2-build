@@ -25,6 +25,10 @@ then
     fw_path=~/esphome-configs/.esphome/build/${name}/.pioenvs/${name}
     aws s3 cp ${fw_path}/firmware.ota.bin s3://${bucket}/esphome-builds/${name}.${version}.ota.bin 
     aws s3 cp ${fw_path}/firmware.factory.bin s3://${bucket}/esphome-builds/${name}.${version}.0x0.bin
+    md5sum ${fw_path}/firmware.ota.bin > ${fw_path}/firmware.ota.md5
+    md5sum ${fw_path}/firmware.factory.bin > ${fw_path}/firmware.0x0.md5
+    aws s3 cp ${fw_path}/firmware.ota.md5 s3://${bucket}/esphome-builds/${name}.${version}.ota.md5 
+    aws s3 cp ${fw_path}/firmware.0x0.md5 s3://${bucket}/esphome-builds/${name}.${version}.0x0.md5
     rm -rf ~/esphome-configs/.esphome/build/${name}
   else    
     base64_log=$(cat /tmp/${name}.${version}.log.txt | base64)
