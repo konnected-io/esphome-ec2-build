@@ -20,9 +20,9 @@ This creates an EC2 instance and bootstraps it by installing required Python pac
 
 ```
 aws ec2 run-instances                                  \
-  --image-id ami-0a3c3a20c09d6f377                     \
+  --image-id ami-01816d07b1128cd2d                     \
   --count 1                                            \
-  --instance-type t2.medium                            \
+  --instance-type c7i-flex.large                            \
   --key-name esphome-cloud-build-key-production                   \
   --user-data file://bootstrap.sh                      \
   --iam-instance-profile '
