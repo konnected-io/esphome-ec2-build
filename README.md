@@ -20,10 +20,10 @@ This creates an EC2 instance and bootstraps it by installing required Python pac
 
 ```
 aws ec2 run-instances                                  \
-  --image-id ami-01816d07b1128cd2d                     \
+  --image-id ami-0b6a57ccc1405257a                     \
   --count 1                                            \
-  --instance-type c7i-flex.large                            \
-  --key-name esphome-cloud-build-key-production                   \
+  --instance-type c8g.large                            \
+  --key-name esphome-cloud-build-key-production        \
   --user-data file://bootstrap.sh                      \
   --iam-instance-profile '
       {
@@ -80,12 +80,49 @@ aws events put-rule --name esphome-cloud-build-start                            
 Set `KONNECTED_ENV` to `dev` or `prod` in a `.env` file in the home directory.
 
 ### Create/update Target Instance
-Add a Target to the EventBridge Rule to kick off the build script on the EC2 instance. If you
-later replace the instance, just edit `rule-target.json` and run this command again to point
-the EventBridge Rule to the new instance.
+Add a Target to the EventBridge Rule to kick off the build script on the EC2 instance identified by tags.
 
 Replace `ACCOUNT_ID` in `rule-target.json` with your AWS Account ID.
 
 ```
 aws events put-targets --cli-input-json file://rule-target.json
+```
+
+### Create a Maintenance Window to update ESPHome periodically
+```
+aws ssm create-maintenance-window  \
+  --name "Update_ESPHome" \
+  --schedule "rate(2 days)" \
+  --duration 1 \
+  --cutoff 0 \
+
+aws ssm register-target-with-maintenance-window \
+  --window-id <mw-from-above>  \
+  --resource-type "INSTANCE"
+  --targets "Key=tag:esphome-cloud-build,Values=build"
+
+aws ssm register-task-with-maintenance-window \
+  --window-id <mw-from-above>  \
+  --task-type "RUN_COMMAND"  \
+  --task-arn "AWS-RunShellScript"  \
+  --service-role-arn "arn:aws:iam::684083964462:role/aws-service-role/ssm.amazonaws.com/AWSServiceRoleForAmazonSSM"  \
+  --task-invocation-parameters '
+      {
+        "RunCommand": {
+            "Comment": "",
+            "DocumentVersion": "$DEFAULT",
+            "Parameters": {
+                "commands": [
+                    "runuser -l ec2-user -c \'pip3 install --upgrade esphome\'"
+                ],
+                "executionTimeout": [
+                    "600"
+                ],
+                "workingDirectory": [
+                    ""
+                ]
+            },
+            "TimeoutSeconds": 600
+        }
+      }'
 ```

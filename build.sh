@@ -22,7 +22,7 @@ then
   
   if [ $? -eq 0 ]
   then
-    fw_path=~/esphome-configs/.esphome/build/${name}/.pioenvs/${name}
+    fw_path=~/esphome-configs/.esphome/build/${name}/build
     aws s3 cp ${fw_path}/firmware.ota.bin s3://${bucket}/esphome-builds/${name}.${version}.ota.bin 
     aws s3 cp ${fw_path}/firmware.factory.bin s3://${bucket}/esphome-builds/${name}.${version}.0x0.bin
     md5sum ${fw_path}/firmware.ota.bin > ${fw_path}/firmware.ota.md5
