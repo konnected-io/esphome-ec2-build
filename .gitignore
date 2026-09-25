@@ -1,0 +1,2 @@
+environments/*.env
+!environments/example.env
