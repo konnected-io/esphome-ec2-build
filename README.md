@@ -16,24 +16,19 @@ Follow _Step 1_ in [this tutorial](https://aws.amazon.com/getting-started/hands-
 (optional) If you want to be able to ssh into the instance, create a Key Pair in the AWS Console: EC2 > Network & Security > Key Pairs. Name the key pair `esphome-cloud-build-key` and download the private key.
 
 ### Create EC2 Instance
-This creates an EC2 instance and bootstraps it by installing required Python packages. The ESPHome build will run on this instance. I am still experimenting on what is the optimal instance size for this task. It works on a `t2.micro` and it's eligible for free tier so using this for testing.
+Create a settings file for each environment by copying `environments/example.env` to `environments/<env>.env` (e.g. `dev.env`, `prod.env`) and filling in the AWS account ID, instance type, key pair name and `KONNECTED_ENV`. These files are gitignored.
+
+A small Graviton instance such as `t4g.micro` (1 GB RAM plus the swap that bootstrap adds) is enough for low-traffic use. Use a larger one such as `c8g.large` for faster builds.
+
+Then launch an instance with `launch.sh`, using AWS credentials for that environment's account:
 
 ```
-aws ec2 run-instances                                  \
-  --image-id ami-0b6a57ccc1405257a                     \
-  --count 1                                            \
-  --instance-type c8g.large                            \
-  --key-name esphome-cloud-build-key-production        \
-  --user-data file://bootstrap.sh                      \
-  --iam-instance-profile '
-      {
-        "Name" : "EnablesEC2ToAccessSystemsManagerRole"
-      }'                                               \
-  --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30}}]' \
-  --tag-specifications '[{"ResourceType":"instance","Tags":[{"Key":"esphome-cloud-build","Value":"build"}]}]'    
+./launch.sh dev
 ```
 
-Save the Instance ID that is created, you will need it later. View and connect to the instance in AWS Console: EC2 > Instances
+This launches the latest Amazon Linux 2023 (arm64/Graviton) AMI and bootstraps it with `bootstrap.sh`, which installs Python 3.12 and ESPHome, writes `~/.env` for the environment, and installs `build.sh` and `update-esphome.sh`. Bootstrap output is logged to `/var/log/cloud-init-output.log` on the instance.
+
+The new instance is tagged `esphome-cloud-build=staging` so it does not receive builds until it's promoted (see [Replace an instance](#replace-an-instance)). Save the Instance ID that it prints.
 
 ### Update SSM Agent
 
@@ -70,14 +65,11 @@ aws events put-rule --name esphome-cloud-build-start                            
       "detail-type": ["Object Created"],
       "detail": {
         "bucket": {
-          "name": ["konnected-esphome-builds"]
+          "name": ["BUCKET"]
         }
       }
     }'                                                                                      \
 ```
-
-### Create .env
-Set `KONNECTED_ENV` to `dev` or `prod` in a `.env` file in the home directory.
 
 ### Create/update Target Instance
 Add a Target to the EventBridge Rule to kick off the build script on the EC2 instance identified by tags.
@@ -89,40 +81,56 @@ aws events put-targets --cli-input-json file://rule-target.json
 ```
 
 ### Create a Maintenance Window to update ESPHome periodically
+The maintenance window runs `update-esphome.sh`, which upgrades ESPHome and **fails** if the installed version is still behind PyPI (for example, when a new ESPHome release requires a newer Python than the instance has). If that happens, bump `PYTHON` in `bootstrap.sh` and replace the instance.
+
 ```
 aws ssm create-maintenance-window  \
   --name "Update_ESPHome" \
   --schedule "rate(2 days)" \
   --duration 1 \
-  --cutoff 0 \
+  --cutoff 0
 
 aws ssm register-target-with-maintenance-window \
   --window-id <mw-from-above>  \
-  --resource-type "INSTANCE"
+  --resource-type "INSTANCE" \
+  --name "esphome-cloud-build" \
   --targets "Key=tag:esphome-cloud-build,Values=build"
 
 aws ssm register-task-with-maintenance-window \
   --window-id <mw-from-above>  \
   --task-type "RUN_COMMAND"  \
   --task-arn "AWS-RunShellScript"  \
-  --service-role-arn "arn:aws:iam::684083964462:role/aws-service-role/ssm.amazonaws.com/AWSServiceRoleForAmazonSSM"  \
+  --targets "Key=WindowTargetIds,Values=<window-target-id-from-above>" \
+  --max-concurrency 1 --max-errors 1 \
+  --service-role-arn "arn:aws:iam::<ACCOUNT_ID>:role/aws-service-role/ssm.amazonaws.com/AWSServiceRoleForAmazonSSM"  \
   --task-invocation-parameters '
       {
         "RunCommand": {
-            "Comment": "",
-            "DocumentVersion": "$DEFAULT",
             "Parameters": {
-                "commands": [
-                    "runuser -l ec2-user -c \'pip3 install --upgrade esphome\'"
-                ],
-                "executionTimeout": [
-                    "600"
-                ],
-                "workingDirectory": [
-                    ""
-                ]
+                "commands": ["runuser -l ec2-user -c ./update-esphome.sh"],
+                "executionTimeout": ["600"]
             },
             "TimeoutSeconds": 600
         }
       }'
 ```
+
+Point the task at the tag-based window target (as above), not at an instance ID, so replacing the instance doesn't require updating the maintenance window.
+
+To switch an existing task from an instance ID to the window target:
+```
+aws ssm update-maintenance-window-task --window-id <mw-id> --window-task-id <task-id> \
+  --targets "Key=WindowTargetIds,Values=<window-target-id>" \
+  --task-invocation-parameters '{"RunCommand":{"Parameters":{"commands":["runuser -l ec2-user -c ./update-esphome.sh"],"executionTimeout":["600"]},"TimeoutSeconds":600}}'
+```
+
+### Replace an instance
+1. Launch a new instance with `./launch.sh <env>`. It's tagged `staging`, so it won't receive builds yet.
+2. SSH in and check it: `cloud-init status` shows `done`, `esphome version` shows the latest ESPHome, and `./update-esphome.sh` succeeds. Compile a config with `esphome compile` to test it.
+3. Promote the new instance and demote the old one. Builds and the maintenance window target the `build` tag, so don't leave both instances tagged `build` or every upload will build twice. SSM can take a few minutes to see the tag change, so builds may not reach either instance for a short time.
+   ```
+   aws ec2 create-tags --resources <new-instance-id> --tags Key=esphome-cloud-build,Value=build
+   aws ec2 create-tags --resources <old-instance-id> --tags Key=esphome-cloud-build,Value=retired
+   aws ec2 stop-instances --instance-ids <old-instance-id>
+   ```
+4. Once the new instance has handled real builds for a few days, terminate the old one.
